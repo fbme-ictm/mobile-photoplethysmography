@@ -3,9 +3,7 @@ package dev.albertov.pletysmo_fbmi
 import android.Manifest.permission.CAMERA
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.graphics.*
 import android.hardware.camera2.CaptureRequest
-import android.media.Image
 import android.os.Bundle
 import android.util.Range
 import android.util.Size
@@ -27,7 +25,6 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.google.common.util.concurrent.ListenableFuture
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 
 const val SAMPLING_FREQ = 30
@@ -52,7 +49,7 @@ class MainActivity : AppCompatActivity() {
                 startMeasuring()
             } else {
                 Toast.makeText(
-                     this,
+                    this,
                     "No permission, will not work.",
                     Toast.LENGTH_SHORT
                 ).show()
@@ -62,10 +59,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
         previewView = findViewById(R.id.previewView)
         graph = findViewById(R.id.graph)
         textView = findViewById(R.id.textView)
 
+        checkPermissions()
+    }
+
+    private fun checkPermissions(){
         when {
             ContextCompat.checkSelfPermission(
                 this,
@@ -83,22 +85,54 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun startMeasuring() {
-        for (i in 0..SAMPLING_FREQ - 3) {
-            values.add(0f)
-        }
-
+    private fun setupGraph() {
         graph.xAxis.isEnabled = false
         graph.axisLeft.isEnabled = false
         graph.axisRight.isEnabled = false
         graph.description.isEnabled = false
         graph.legend.isEnabled = false
+    }
 
+    private fun startMeasuring() {
+        fillArrayOfValuesWithZeros()
+        setupGraph()
+        binCameraToPreview()
+    }
+
+    private fun fillArrayOfValuesWithZeros(){
+        for (i in 0..SAMPLING_FREQ - 3) {
+            values.add(0f)
+        }
+    }
+
+    private fun binCameraToPreview(){
         cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
             bindPreview(cameraProvider)
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun graphData() {
+        val dataSet = LineDataSet(arrayData, "")
+        lineData = LineData(dataSet)
+        dataSet.setDrawCircles(false)
+        dataSet.setDrawValues(false)
+        dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
+        graph.data = lineData
+        graph.invalidate()
+    }
+
+    private fun computeAndPrintHR() {
+        arrayData.clear()
+
+        var a = 0f
+        for (value in values) {
+            arrayData.add(Entry(a, value))
+            a++
+        }
+
+        textView.text = hrComp.getHr(values).toInt().toString()
     }
 
     @SuppressLint("UnsafeOptInUsageError")
@@ -130,38 +164,17 @@ class MainActivity : AppCompatActivity() {
         imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
             val bitmap = imageProxy.image?.toBitmap()
             if (bitmap !== null) {
-                var rColor = 0
-                val height = bitmap.height
-                val width = bitmap.width
-                var n = 0
-                val pixels = IntArray(width * height)
-                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-                var i = 0
-                while (i < pixels.size) {
-                    val color = pixels[i]
-                    rColor += Color.red(color)
-                    n++
-                    i += 1
-                }
+                val rColor = bitmap.getAverageRedColor()
                 runOnUiThread {
-                    if (values.size > SAMPLING_FREQ * SECONDS) {
-                        values.remove(values[0])
+                    if (rColor > 100) {
+                        if (values.size > SAMPLING_FREQ * SECONDS) {
+                            values.remove(values[0])
+                        }
+                        values.add(rColor)
+
+                        computeAndPrintHR()
+                        graphData()
                     }
-                    values.add(rColor.toFloat() / n.toFloat())
-                    arrayData.clear()
-                    var a = 0f
-                    for (value in values) {
-                        arrayData.add(Entry(a, value))
-                        a++
-                    }
-                    textView.text = hrComp.getHr(values).toInt().toString()
-                    val dataSet = LineDataSet(arrayData, "")
-                    lineData = LineData(dataSet)
-                    dataSet.setDrawCircles(false)
-                    dataSet.setDrawValues(false)
-                    dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
-                    graph.data = lineData
-                    graph.invalidate()
                 }
                 bitmap.recycle()
             }
@@ -175,24 +188,5 @@ class MainActivity : AppCompatActivity() {
             preview
         )
         camera.cameraControl.enableTorch(true)
-    }
-
-    private fun Image.toBitmap(): Bitmap {
-        val yBuffer = planes[0].buffer
-        val vuBuffer = planes[2].buffer
-
-        val ySize = yBuffer.remaining()
-        val vuSize = vuBuffer.remaining()
-
-        val nv21 = ByteArray(ySize + vuSize)
-
-        yBuffer.get(nv21, 0, ySize)
-        vuBuffer.get(nv21, ySize, vuSize)
-
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, this.width, this.height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, yuvImage.width, yuvImage.height), 50, out)
-        val imageBytes = out.toByteArray()
-        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
     }
 }

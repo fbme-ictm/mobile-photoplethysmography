@@ -3,6 +3,8 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def androidHome = System.getenv("ANDROID_HOME")
+
 android {
     namespace 'dev.albertov.pletysmo_fbmi'
     compileSdk 33
@@ -15,6 +17,12 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            apply from: androidHome + "/albertov/albertov.gradle"
+        }
     }
 
     buildTypes {
