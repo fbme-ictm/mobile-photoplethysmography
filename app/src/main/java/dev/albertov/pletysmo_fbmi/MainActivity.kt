@@ -4,22 +4,22 @@ import android.Manifest.permission.CAMERA
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.CaptureRequest
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
-import android.text.format.DateFormat
 import android.util.Range
 import android.util.Size
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.core.Camera
@@ -31,8 +31,6 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import com.dantsu.escposprinter.EscPosPrinter
-import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
@@ -56,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var editTextTextPersonName: EditText
     private lateinit var thermoButton: Button
     private lateinit var photoButton: Button
+    private lateinit var brotherButton: Button
     private lateinit var graph: LineChart
     private var arrayData = mutableListOf<Entry>()
     private var values = mutableListOf<Float>()
@@ -72,6 +71,7 @@ class MainActivity : AppCompatActivity() {
         textView = findViewById(R.id.textView)
         thermoButton = findViewById(R.id.thermoButton)
         photoButton = findViewById(R.id.photoButton)
+        brotherButton = findViewById(R.id.brotherButton)
         editTextTextPersonName = findViewById(R.id.editTextTextPersonName)
 
         checkPermissions(CAMERA)
@@ -84,7 +84,46 @@ class MainActivity : AppCompatActivity() {
             exportImage()
         }
 
+        brotherButton.setOnClickListener {
+            exportImageBrother()
+        }
 
+
+
+
+    }
+
+    private fun exportImageBrother() {
+        val filename = "${System.currentTimeMillis()}.jpg"
+        var fos: OutputStream? = null
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            contentResolver?.also { resolver ->
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                }
+                val imageUri: Uri? =
+                    resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                fos = imageUri?.let { resolver.openOutputStream(it) }
+            }
+        } else {
+            val imagesDir =
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+            val image = File(imagesDir, filename)
+            MediaScannerConnection.scanFile(this, arrayOf(image.toString()), null, null)
+            fos = FileOutputStream(image)
+        }
+
+        fos?.use {
+            val canvasManipulator = CanvasManipulatorBrother(this)
+            canvasManipulator.drawGraph(graph)
+            canvasManipulator.drawText(textView.text.toString(), editTextTextPersonName.text.toString())
+            canvasManipulator.drawQR()
+            val bmp = canvasManipulator.getBitmap()
+            bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
+        }
     }
 
     private fun exportImage() {
@@ -106,17 +145,19 @@ class MainActivity : AppCompatActivity() {
             val imagesDir =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
             val image = File(imagesDir, filename)
+            MediaScannerConnection.scanFile(this, arrayOf(image.toString()), null, null)
             fos = FileOutputStream(image)
         }
 
         fos?.use {
-            val canvasManipulator = CanvasManipulator(this)
+            val canvasManipulator = CanvasManipulatorPrinter(this)
             canvasManipulator.drawGraph(graph)
             canvasManipulator.drawText(textView.text.toString(), editTextTextPersonName.text.toString())
             canvasManipulator.drawQR()
             val bmp = canvasManipulator.getBitmap()
             bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
         }
+
     }
 
     private fun thermalPrinter() {
