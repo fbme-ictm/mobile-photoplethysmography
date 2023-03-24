@@ -87,10 +87,6 @@ class MainActivity : AppCompatActivity() {
         brotherButton.setOnClickListener {
             exportImageBrother()
         }
-
-
-
-
     }
 
     private fun exportImageBrother() {
