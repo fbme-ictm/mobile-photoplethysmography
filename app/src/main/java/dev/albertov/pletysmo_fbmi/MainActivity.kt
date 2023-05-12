@@ -3,7 +3,10 @@ package dev.albertov.pletysmo_fbmi
 import android.Manifest.permission.CAMERA
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
@@ -13,7 +16,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.FileUtils
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Range
 import android.util.Size
 import android.widget.Button
@@ -31,6 +36,14 @@ import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.brother.sdk.lmprinter.Channel
+import com.brother.sdk.lmprinter.OpenChannelError
+import com.brother.sdk.lmprinter.PrintError
+import com.brother.sdk.lmprinter.PrinterDriverGenerateResult
+import com.brother.sdk.lmprinter.PrinterDriverGenerator
+import com.brother.sdk.lmprinter.PrinterModel
+import com.brother.sdk.lmprinter.setting.PrintImageSettings
+import com.brother.sdk.lmprinter.setting.QLPrintSettings
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
@@ -52,8 +65,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var camera: Camera
     private lateinit var textView: TextView
     private lateinit var editTextTextPersonName: EditText
-    private lateinit var thermoButton: Button
-    private lateinit var photoButton: Button
     private lateinit var brotherButton: Button
     private lateinit var graph: LineChart
     private var arrayData = mutableListOf<Entry>()
@@ -69,29 +80,51 @@ class MainActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         graph = findViewById(R.id.graph)
         textView = findViewById(R.id.textView)
-        thermoButton = findViewById(R.id.thermoButton)
-        photoButton = findViewById(R.id.photoButton)
         brotherButton = findViewById(R.id.brotherButton)
         editTextTextPersonName = findViewById(R.id.editTextTextPersonName)
 
         checkPermissions(CAMERA)
-
-        thermoButton.setOnClickListener {
-            thermalPrinter()
-        }
-
-        photoButton.setOnClickListener {
-            exportImage()
-        }
 
         brotherButton.setOnClickListener {
             exportImageBrother()
         }
     }
 
+    fun printImage(file: Bitmap) {
+        //Input your printer's IP address
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+
+        val channel: Channel = Channel.newBluetoothChannel("58:93:D8:AB:C6:5F", bluetoothManager.adapter)
+        //Input your printer's macAddress
+        // val channel: Channel = Channel.newBluetoothChannel(macAddress, BluetoothAdapter.getDefaultAdapter())
+        val result: PrinterDriverGenerateResult = PrinterDriverGenerator.openChannel(channel)
+        if (result.error.code !== OpenChannelError.ErrorCode.NoError) {
+            Log.e("", "Error - Open Channel: " + result.error.code)
+            return
+        }
+        val printerDriver = result.driver
+
+        val printSettings = QLPrintSettings(PrinterModel.QL_820NWB)
+        printSettings.labelSize = QLPrintSettings.LabelSize.DieCutW29H90
+        printSettings.workPath = filesDir.absolutePath
+        printSettings.imageRotation = PrintImageSettings.Rotation.Rotate90
+        printSettings.isAutoCut = true
+
+
+        val printError: PrintError = printerDriver.printImage(file, printSettings)
+        if (printError.code != PrintError.ErrorCode.NoError) {
+            Log.d("", "Error - Print Image: " + printError.code);
+        }
+        else {
+            Log.d("", "Success - Print Image");
+        }
+        printerDriver.closeChannel();
+    }
+
     private fun exportImageBrother() {
         val filename = "${System.currentTimeMillis()}.jpg"
         var fos: OutputStream? = null
+        var imageF: File? = null
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             contentResolver?.also { resolver ->
@@ -108,6 +141,7 @@ class MainActivity : AppCompatActivity() {
             val imagesDir =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
             val image = File(imagesDir, filename)
+            imageF = image
             MediaScannerConnection.scanFile(this, arrayOf(image.toString()), null, null)
             fos = FileOutputStream(image)
         }
@@ -119,45 +153,10 @@ class MainActivity : AppCompatActivity() {
             canvasManipulator.drawQR()
             val bmp = canvasManipulator.getBitmap()
             bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
-        }
-    }
+            printImage(bmp)
 
-    private fun exportImage() {
-        val filename = "${System.currentTimeMillis()}.jpg"
-        var fos: OutputStream? = null
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver?.also { resolver ->
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
-                }
-                val imageUri: Uri? =
-                    resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                fos = imageUri?.let { resolver.openOutputStream(it) }
-            }
-        } else {
-            val imagesDir =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val image = File(imagesDir, filename)
-            MediaScannerConnection.scanFile(this, arrayOf(image.toString()), null, null)
-            fos = FileOutputStream(image)
         }
 
-        fos?.use {
-            val canvasManipulator = CanvasManipulatorPrinter(this)
-            canvasManipulator.drawGraph(graph)
-            canvasManipulator.drawText(textView.text.toString(), editTextTextPersonName.text.toString())
-            canvasManipulator.drawQR()
-            val bmp = canvasManipulator.getBitmap()
-            bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
-        }
-
-    }
-
-    private fun thermalPrinter() {
-        ThermalPrinter().print(values)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

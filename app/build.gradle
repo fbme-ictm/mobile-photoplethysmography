@@ -50,6 +50,7 @@ dependencies {
     implementation 'androidx.camera:camera-lifecycle:1.2.2'
     implementation "androidx.camera:camera-core:${camerax_version}"
     implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation files('./libs/BrotherPrintLibrary.aar')
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
     implementation 'com.github.DantSu:ESCPOS-ThermalPrinter-Android:3.2.0'
     implementation 'com.indvd00m.ascii.render:ascii-render:2.2.0'
