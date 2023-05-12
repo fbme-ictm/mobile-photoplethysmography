@@ -3,11 +3,9 @@ package dev.albertov.pletysmo_fbmi
 import android.Manifest.permission.CAMERA
 import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.CaptureRequest
@@ -16,7 +14,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.os.FileUtils
 import android.provider.MediaStore
 import android.util.Log
 import android.util.Range
@@ -49,6 +46,10 @@ import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -72,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var lineData: LineData
     private var hrComp = HRComputer()
     val REQUESTCODE = 555
+    private val scope = CoroutineScope(newSingleThreadContext("name"))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,17 +88,18 @@ class MainActivity : AppCompatActivity() {
         checkPermissions(CAMERA)
 
         brotherButton.setOnClickListener {
-            exportImageBrother()
+            Toast.makeText(this, "Printing!", Toast.LENGTH_LONG).show()
+            runBlocking {
+                exportImageBrother()
+            }
         }
     }
 
     fun printImage(file: Bitmap) {
-        //Input your printer's IP address
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
 
-        val channel: Channel = Channel.newBluetoothChannel("58:93:D8:AB:C6:5F", bluetoothManager.adapter)
-        //Input your printer's macAddress
-        // val channel: Channel = Channel.newBluetoothChannel(macAddress, BluetoothAdapter.getDefaultAdapter())
+        val channel: Channel =
+            Channel.newBluetoothChannel("58:93:D8:AB:C6:5F", bluetoothManager.adapter)
         val result: PrinterDriverGenerateResult = PrinterDriverGenerator.openChannel(channel)
         if (result.error.code !== OpenChannelError.ErrorCode.NoError) {
             Log.e("", "Error - Open Channel: " + result.error.code)
@@ -114,54 +117,65 @@ class MainActivity : AppCompatActivity() {
         val printError: PrintError = printerDriver.printImage(file, printSettings)
         if (printError.code != PrintError.ErrorCode.NoError) {
             Log.d("", "Error - Print Image: " + printError.code);
-        }
-        else {
+        } else {
             Log.d("", "Success - Print Image");
         }
         printerDriver.closeChannel();
     }
 
-    private fun exportImageBrother() {
-        val filename = "${System.currentTimeMillis()}.jpg"
-        var fos: OutputStream? = null
-        var imageF: File? = null
+    suspend fun exportImageBrother() {
+        scope.launch {
+            val filename = "${System.currentTimeMillis()}.jpg"
+            var fos: OutputStream? = null
+            var imageF: File? = null
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver?.also { resolver ->
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                contentResolver?.also { resolver ->
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
+                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
+                    }
+                    val imageUri: Uri? =
+                        resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    fos = imageUri?.let { resolver.openOutputStream(it) }
                 }
-                val imageUri: Uri? =
-                    resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                fos = imageUri?.let { resolver.openOutputStream(it) }
+            } else {
+                val imagesDir =
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+                val image = File(imagesDir, filename)
+                MediaScannerConnection.scanFile(
+                    this@MainActivity,
+                    arrayOf(image.toString()),
+                    null,
+                    null
+                )
+                fos = FileOutputStream(image)
             }
-        } else {
-            val imagesDir =
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val image = File(imagesDir, filename)
-            imageF = image
-            MediaScannerConnection.scanFile(this, arrayOf(image.toString()), null, null)
-            fos = FileOutputStream(image)
+
+            fos?.use {
+                val canvasManipulator = CanvasManipulatorBrother(this@MainActivity)
+                canvasManipulator.drawGraph(graph)
+                canvasManipulator.drawText(
+                    textView.text.toString(),
+                    editTextTextPersonName.text.toString()
+                )
+                canvasManipulator.drawQR()
+                val bmp = canvasManipulator.getBitmap()
+                bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
+                printImage(bmp)
+
+            }
         }
-
-        fos?.use {
-            val canvasManipulator = CanvasManipulatorBrother(this)
-            canvasManipulator.drawGraph(graph)
-            canvasManipulator.drawText(textView.text.toString(), editTextTextPersonName.text.toString())
-            canvasManipulator.drawQR()
-            val bmp = canvasManipulator.getBitmap()
-            bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
-            printImage(bmp)
-
-        }
-
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if(requestCode == REQUESTCODE){
+        if (requestCode == REQUESTCODE) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 startMeasuring()
             } else {
@@ -174,7 +188,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkPermissions(permission: String ) {
+    private fun checkPermissions(permission: String) {
         when {
             ContextCompat.checkSelfPermission(
                 this,
@@ -182,20 +196,26 @@ class MainActivity : AppCompatActivity() {
             ) == PackageManager.PERMISSION_GRANTED -> {
                 startMeasuring()
             }
+
             shouldShowRequestPermissionRationale(permission) -> {
                 Toast.makeText(this, "Need all permissions", Toast.LENGTH_SHORT)
                     .show()
             }
+
             else -> {
                 //requestPermissionLauncher.launch(permission)
-                ActivityCompat.requestPermissions(this, arrayOf(CAMERA, WRITE_EXTERNAL_STORAGE), REQUESTCODE)
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(CAMERA, WRITE_EXTERNAL_STORAGE),
+                    REQUESTCODE
+                )
             }
         }
     }
 
     private fun setupGraph() {
         graph.setBackgroundColor(Color.BLACK);
-        graph.setViewPortOffsets(0f,0f,0f,0f)
+        graph.setViewPortOffsets(0f, 0f, 0f, 0f)
         graph.xAxis.isEnabled = false
         graph.axisLeft.isEnabled = false
         graph.axisRight.isEnabled = false
