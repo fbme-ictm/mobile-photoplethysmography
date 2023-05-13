@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var previewView: PreviewView
     private var camera: Camera? = null
     private lateinit var textView: TextView
+    private lateinit var textViewVersion: TextView
     private lateinit var editTextTextPersonName: EditText
     private lateinit var brotherButton: Button
     private lateinit var graph: LineChart
@@ -83,6 +84,8 @@ class MainActivity : AppCompatActivity() {
         previewView = findViewById(R.id.previewView)
         graph = findViewById(R.id.graph)
         textView = findViewById(R.id.textView)
+        textViewVersion = findViewById(R.id.version)
+        textViewVersion.text = "v${BuildConfig.VERSION_NAME}"
         brotherButton = findViewById(R.id.brotherButton)
         editTextTextPersonName = findViewById(R.id.editTextTextPersonName)
 
