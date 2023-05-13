@@ -36,10 +36,10 @@ assembleRelease:
     refs:
       - main
   variables:
-    SECURE_FILES_DOWNLOAD_PATH: 'app/'
+    SECURE_FILES_DOWNLOAD_PATH: '/'
   script:
     - ./gradlew assembleRelease
   artifacts:
     paths:
-      - app/build/outputs/
+      - app/build/outputs/apk/release/
 
