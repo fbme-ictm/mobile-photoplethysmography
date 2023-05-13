@@ -45,6 +45,8 @@ import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputEditText
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -66,8 +68,8 @@ class MainActivity : AppCompatActivity() {
     private var camera: Camera? = null
     private lateinit var textView: TextView
     private lateinit var textViewVersion: TextView
-    private lateinit var editTextTextPersonName: EditText
-    private lateinit var brotherButton: Button
+    private lateinit var editTextTextPersonName: TextInputEditText
+    private lateinit var brotherButton: MaterialButton
     private lateinit var graph: LineChart
     private var arrayData = mutableListOf<Entry>()
     private var values = mutableListOf<Float>()
