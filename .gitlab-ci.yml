@@ -34,7 +34,7 @@ assembleRelease:
   stage: build
   only:
     refs:
-      - master
+      - main
   variables:
     SECURE_FILES_DOWNLOAD_PATH: 'app/'
   script:
