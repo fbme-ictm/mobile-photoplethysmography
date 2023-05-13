@@ -4,6 +4,12 @@ plugins {
 }
 
 def androidHome = System.getenv("ANDROID_HOME")
+def keystoreProperties = new Properties()
+
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
 
 android {
     namespace 'dev.albertov.pletysmo_fbmi'
@@ -21,7 +27,13 @@ android {
 
     signingConfigs {
         release {
-            apply from: androidHome + "/albertov/albertov.gradle"
+            if(keystorePropertiesFile.exists()){
+                minifyEnabled false
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                storePassword keystoreProperties['storePassword']
+            }
         }
     }
 
