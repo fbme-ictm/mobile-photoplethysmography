@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var lineData: LineData
     private var hrComp = HRComputer()
     val REQUESTCODE = 555
-    private val scope = CoroutineScope(newSingleThreadContext("name"))
+    private val scope = CoroutineScope(newSingleThreadContext("fbmipletysmothread"))
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,7 +128,6 @@ class MainActivity : AppCompatActivity() {
         scope.launch {
             val filename = "${System.currentTimeMillis()}.jpg"
             var fos: OutputStream? = null
-            var imageF: File? = null
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 contentResolver?.also { resolver ->
@@ -165,7 +164,6 @@ class MainActivity : AppCompatActivity() {
                 val bmp = canvasManipulator.getBitmap()
                 bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
                 printImage(bmp)
-
             }
         }
     }
