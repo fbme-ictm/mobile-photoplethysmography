@@ -63,7 +63,7 @@ const val SECONDS = 5
 class MainActivity : AppCompatActivity() {
     private lateinit var cameraProviderFuture: ListenableFuture<ProcessCameraProvider>
     private lateinit var previewView: PreviewView
-    private lateinit var camera: Camera
+    private var camera: Camera? = null
     private lateinit var textView: TextView
     private lateinit var editTextTextPersonName: EditText
     private lateinit var brotherButton: Button
@@ -124,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         printerDriver.closeChannel();
     }
 
-    suspend fun exportImageBrother() {
+    private fun exportImageBrother() {
         scope.launch {
             val filename = "${System.currentTimeMillis()}.jpg"
             var fos: OutputStream? = null
@@ -258,6 +258,11 @@ class MainActivity : AppCompatActivity() {
         graph.invalidate()
     }
 
+    public override fun onResume() {
+        super.onResume()
+            camera?.cameraControl?.enableTorch(true)
+    }
+
     private fun computeAndPrintHR() {
         arrayData.clear()
 
@@ -325,6 +330,6 @@ class MainActivity : AppCompatActivity() {
             imageAnalysis,
             preview
         )
-        camera.cameraControl.enableTorch(true)
+        camera?.cameraControl?.enableTorch(true)
     }
 }
