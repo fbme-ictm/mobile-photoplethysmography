@@ -78,6 +78,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        supportActionBar?.title = "¯\\_(ツ)_/¯  FBMI - Fotopletysmo"
 
         previewView = findViewById(R.id.previewView)
         graph = findViewById(R.id.graph)
