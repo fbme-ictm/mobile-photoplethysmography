@@ -33,8 +33,9 @@ assembleRelease:
   interruptible: true
   stage: build
   only:
-    refs:
-      - main
+    - tags
+  except:
+    - branches
   variables:
     SECURE_FILES_DOWNLOAD_PATH: '/'
   script:
