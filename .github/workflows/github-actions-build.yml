@@ -1,0 +1,39 @@
+name: Build
+run-name: ${{ github.actor }} Building 🚀
+on:
+  push:
+    tags:
+      - '*'
+permissions:
+  contents: write
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up our JDK environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v2
+      - name: Decode Keystore
+        run: |
+          echo ${{ secrets.SIGN_PROPERTIES }} > ${{ github.workspace }}/key.properties
+          echo ${{ secrets.SIGN_KEY }} | base64 --decode > ${{ github.workspace }}/key.jks
+      - name: Build
+        run: ./gradlew assembleRelease
+      - name: Upload Release Build to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: app/build/outputs/apk/release/app-release.apk
+      - name: Create Github Release
+        uses: softprops/action-gh-release@v1
+        with:
+           generate_release_notes: true
+           files: |
+             app/build/outputs/apk/release/app-release.apk
+

@@ -18,8 +18,6 @@ import android.provider.MediaStore
 import android.util.Log
 import android.util.Range
 import android.util.Size
-import android.widget.Button
-import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +26,8 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun printImage(file: Bitmap) {
+    private fun printImage(file: Bitmap) {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
 
         val channel: Channel =
@@ -254,8 +254,8 @@ class MainActivity : AppCompatActivity() {
         dataSet.setDrawValues(false)
         dataSet.setDrawFilled(true)
         val drawable = ContextCompat.getDrawable(this, R.drawable.shader)
-        dataSet.setFillDrawable(drawable)
-        dataSet.setColor(ContextCompat.getColor(this, R.color.purple_dark))
+        dataSet.fillDrawable = drawable
+        dataSet.color = ContextCompat.getColor(this, R.color.purple_dark)
         dataSet.mode = LineDataSet.Mode.CUBIC_BEZIER
         graph.data = lineData
         graph.invalidate()
@@ -292,8 +292,12 @@ class MainActivity : AppCompatActivity() {
 
         preview.setSurfaceProvider(previewView.surfaceProvider)
 
+        val resolutionSelector = ResolutionSelector.Builder().setResolutionStrategy(
+            ResolutionStrategy(Size(640, 480),
+            ResolutionStrategy.FALLBACK_RULE_NONE)
+        ).build()
         val imageAnalysisBase = ImageAnalysis.Builder()
-            .setTargetResolution(Size(640, 480))
+            .setResolutionSelector(resolutionSelector)
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         val camera2InterOp = Camera2Interop.Extender(imageAnalysisBase)
         camera2InterOp.setCaptureRequestOption(
