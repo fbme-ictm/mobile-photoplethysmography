@@ -2,8 +2,9 @@ name: Build
 run-name: ${{ github.actor }} Building 🚀
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
+
 permissions:
   contents: write
 jobs:

@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     android:background="#000000"
     android:padding="10dp"
+    android:id="@+id/main"
     tools:context=".MainActivity">
 
         <androidx.cardview.widget.CardView
