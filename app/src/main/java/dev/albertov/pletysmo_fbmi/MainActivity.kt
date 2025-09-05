@@ -4,9 +4,11 @@ import android.Manifest.permission.CAMERA
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.CaptureRequest
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.util.Range
@@ -26,6 +28,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.LifecycleOwner
@@ -48,6 +51,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.runBlocking
+import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.Executors
 
 
@@ -62,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textViewVersion: TextView
     private lateinit var editTextTextPersonName: TextInputEditText
     private lateinit var brotherButton: MaterialButton
+    private lateinit var shareButton: MaterialButton
     private lateinit var graph: LineChart
     private var arrayData = mutableListOf<Entry>()
     private var values = mutableListOf<Float>()
@@ -87,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         textViewVersion = findViewById(R.id.version)
         textViewVersion.text = "v${BuildConfig.VERSION_NAME}"
         brotherButton = findViewById(R.id.brotherButton)
+        shareButton = findViewById(R.id.button)
         editTextTextPersonName = findViewById(R.id.editTextTextPersonName)
 
         checkPermissions(CAMERA)
@@ -96,6 +103,10 @@ class MainActivity : AppCompatActivity() {
             runBlocking {
                 exportImageBrother()
             }
+        }
+
+        shareButton.setOnClickListener {
+            share()
         }
     }
 
@@ -127,19 +138,56 @@ class MainActivity : AppCompatActivity() {
         printerDriver.closeChannel();
     }
 
+    private fun getBitmap(): Bitmap{
+        val canvasManipulator = CanvasManipulatorBrother(this@MainActivity)
+        canvasManipulator.drawGraph(graph)
+        canvasManipulator.drawText(
+            textView.text.toString(),
+            editTextTextPersonName.text.toString()
+        )
+        canvasManipulator.drawQR()
+        return canvasManipulator.getBitmap()
+    }
+
     private fun exportImageBrother() {
         scope.launch {
-                val canvasManipulator = CanvasManipulatorBrother(this@MainActivity)
-                canvasManipulator.drawGraph(graph)
-                canvasManipulator.drawText(
-                    textView.text.toString(),
-                    editTextTextPersonName.text.toString()
-                )
-                canvasManipulator.drawQR()
-                val bmp = canvasManipulator.getBitmap()
                 //bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
-                printImage(bmp)
+                printImage(getBitmap())
         }
+    }
+
+    private fun share() {
+        scope.launch {
+            shareImage(getBitmap())
+        }
+    }
+
+    fun shareImage(bitmap: Bitmap){
+        val uri = getImageUri(bitmap)
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        startActivity(Intent.createChooser(shareIntent, "Share Image via"))
+    }
+
+    fun getImageUri(bitmap: Bitmap): Uri {
+        val imagesFolder = File(cacheDir, "images")
+        imagesFolder.mkdirs()
+
+        val file = File(imagesFolder, "image.png")
+        FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+
+        return FileProvider.getUriForFile(
+            this,
+            "${packageName}.fileprovider",
+            file
+        )
     }
 
     override fun onRequestPermissionsResult(
