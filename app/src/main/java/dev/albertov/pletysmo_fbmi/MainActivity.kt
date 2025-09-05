@@ -1,20 +1,13 @@
 package dev.albertov.pletysmo_fbmi
 
 import android.Manifest.permission.CAMERA
-import android.Manifest.permission.WRITE_EXTERNAL_STORAGE
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.hardware.camera2.CaptureRequest
-import android.media.MediaScannerConnection
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.util.Log
 import android.util.Range
 import android.util.Size
@@ -55,10 +48,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.runBlocking
-import java.io.File
-import java.io.FileOutputStream
-import java.io.OutputStream
-import java.util.*
 import java.util.concurrent.Executors
 
 
@@ -140,34 +129,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun exportImageBrother() {
         scope.launch {
-            val filename = "${System.currentTimeMillis()}.jpg"
-            var fos: OutputStream? = null
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                contentResolver?.also { resolver ->
-                    val contentValues = ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg")
-                        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
-                    }
-                    val imageUri: Uri? =
-                        resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                    fos = imageUri?.let { resolver.openOutputStream(it) }
-                }
-            } else {
-                val imagesDir =
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-                val image = File(imagesDir, filename)
-                MediaScannerConnection.scanFile(
-                    this@MainActivity,
-                    arrayOf(image.toString()),
-                    null,
-                    null
-                )
-                fos = FileOutputStream(image)
-            }
-
-            fos?.use {
                 val canvasManipulator = CanvasManipulatorBrother(this@MainActivity)
                 canvasManipulator.drawGraph(graph)
                 canvasManipulator.drawText(
@@ -176,9 +137,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 canvasManipulator.drawQR()
                 val bmp = canvasManipulator.getBitmap()
-                bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
+                //bmp.compress(Bitmap.CompressFormat.JPEG, 100, it)
                 printImage(bmp)
-            }
         }
     }
 
@@ -219,7 +179,7 @@ class MainActivity : AppCompatActivity() {
                 //requestPermissionLauncher.launch(permission)
                 ActivityCompat.requestPermissions(
                     this,
-                    arrayOf(CAMERA, WRITE_EXTERNAL_STORAGE),
+                    arrayOf(CAMERA),
                     REQUESTCODE
                 )
             }
