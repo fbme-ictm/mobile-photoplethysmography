@@ -4,6 +4,10 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:targetSandboxVersion="2">
     <!--<dist:module dist:instant="true" />-->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
